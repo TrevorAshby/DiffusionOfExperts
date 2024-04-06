@@ -1,3 +1,11 @@
+# virtual env
+.venv/
+
+# datasets
 clothes_dataset/
 photograph_dataset/
 pixelart_dataset/
+
+
+# models
+models/
