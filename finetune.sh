@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# default path for the models directory relative to the script
-models_dir="$(dirname "$(readlink -f "$0")")/models/original"
+# default path for the model_downloads directory relative to the script
+models_dir="$(dirname "$(readlink -f "$0")")/model_downloads/original"
 
 usage() {
   echo "Usage: $0 --dataset PATH [--output_dir PATH]"
@@ -28,32 +28,33 @@ if [ -z "$dataset_path" ]; then
   usage
 fi
 
-# check if the models/original directory exists which we will use as the model to finetune with
+# check if the model_downloads/original directory exists which we will use as the model to finetune with
 # in future maybe have an optional flag that points to model path for when we use quantized models?
 if [ ! -d "$models_dir" ]; then
-  echo "You must save the stable diffusion model to ./models/original"
+  echo "You must save the stable diffusion model to ./model_downloads/original"
   exit 1
 fi
 
 # set output_dir based on dataset_path if it was not already set from the output_dir flag
 if [ "$output_dir_set" = false ]; then
   if [[ "$dataset_path" == *"clothes_dataset"* ]]; then
-    output_dir="./models/clothes_finetuned_model"
+    output_dir="./model_downloads/clothes_finetuned_model"
   elif [[ "$dataset_path" == *"pixelart_dataset"* ]]; then
-    output_dir="./models/pixelart_finetuned_model"
+    output_dir="./model_downloads/pixelart_finetuned_model"
   else
-    output_dir="./models/photograph_finetuned_model"
+    output_dir="./model_downloads/photograph_finetuned_model"
   fi
 fi
 
-accelerate launch --mixed_precision="fp16" train_text_to_image.py \
+accelerate launch train_text_to_image_lora.py \
   --pretrained_model_name_or_path=$models_dir \
   --dataset_name=$dataset_path \
   --resolution=512 --center_crop --random_flip \
-  --max_train_samples=3000 \
-  --num_train_epochs=10 \
-  --checkpointing_steps=1000 \
-  --train_batch_size=16 \
+  --learning_rate=1e-04 \
+  --max_train_samples=1000 \
+  --num_train_epochs=20 \
+  --checkpointing_steps=400 \
+  --train_batch_size=4 \
   --enable_xformers_memory_efficient_attention \
   --output_dir=$output_dir \
 
