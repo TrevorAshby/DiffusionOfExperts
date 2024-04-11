@@ -53,8 +53,9 @@ accelerate launch train_text_to_image_lora.py \
   --learning_rate=1e-04 \
   --max_train_samples=1000 \
   --num_train_epochs=20 \
-  --checkpointing_steps=400 \
+  --checkpointing_steps=1000 \
   --train_batch_size=4 \
+  --resume_from_checkpoint=latest \
   --enable_xformers_memory_efficient_attention \
   --output_dir=$output_dir \
 
