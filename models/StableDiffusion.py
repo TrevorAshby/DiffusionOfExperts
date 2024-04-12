@@ -10,6 +10,7 @@ from diffusers.loaders import LoraLoaderMixin
 from tqdm.notebook import tqdm
 
 from typing import Union, List, Optional
+import os
 
 
 class StableDiffusion(nn.Module):
@@ -19,7 +20,6 @@ class StableDiffusion(nn.Module):
         lora_path: Optional[str] = None, # i.e. './model_downloads/clothes_finetuned_model'
         variant: Optional[str] = None, # i.e. 'fp16' or 'bf16'
         device='cuda',
-        dtype=torch.float32
     ):
         super(StableDiffusion, self).__init__()
                 
@@ -29,17 +29,21 @@ class StableDiffusion(nn.Module):
         # models
         self.text_encoder: CLIPTextModel = CLIPTextModel.from_pretrained(model_path, subfolder="text_encoder", variant=variant)
         self.vae: AutoencoderKL = AutoencoderKL.from_pretrained(model_path, subfolder="vae", variant=variant)
-        self.unet: UNet2DConditionModel = UNet2DConditionModel.from_pretrained(model_path, subfolder="unet", torch_dtype=dtype)
+        self.unet: UNet2DConditionModel = UNet2DConditionModel.from_pretrained(model_path, subfolder="unet")
         
         # make sure we don't compute unnecessary gradients
         self.text_encoder.requires_grad_(False)
         self.vae.requires_grad_(False)
         self.unet.requires_grad_(False) # if there are lora weights, these will be finetuned instead
         
+        self.representative_embedding = None
         # add in lora weights to unet if applicable
         if lora_path:
+            # load lora weights
             state_dict, network_alphas = LoraLoaderMixin.lora_state_dict(lora_path, weight_name='pytorch_lora_weights.safetensors')
             LoraLoaderMixin.load_lora_into_unet(state_dict, network_alphas=network_alphas, unet=self.unet)
+            # load representative embedding
+            self.representative_embedding = torch.load(os.path.join(lora_path, 'representative_embedding.pt'))
         
         self.device = device
         self.guidance_scale = 7.5
@@ -72,6 +76,8 @@ class StableDiffusion(nn.Module):
                 encoder_hidden_states=encoded_prompt,
                 return_dict=False,
             )[0]
+            if torch.isnan(noise_pred).any():
+                raise ValueError()
             
             # perform guidance
             noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)

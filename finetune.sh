@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # default path for the model_downloads directory relative to the script
-models_dir="$(dirname "$(readlink -f "$0")")/model_downloads/original"
+# models_dir="$(dirname "$(readlink -f "$0")")/model_downloads/original"
+models_dir="CompVis/stable-diffusion-v1-4"
 
 usage() {
   echo "Usage: $0 --dataset PATH [--output_dir PATH]"
@@ -28,12 +29,12 @@ if [ -z "$dataset_path" ]; then
   usage
 fi
 
-# check if the model_downloads/original directory exists which we will use as the model to finetune with
-# in future maybe have an optional flag that points to model path for when we use quantized models?
-if [ ! -d "$models_dir" ]; then
-  echo "You must save the stable diffusion model to ./model_downloads/original"
-  exit 1
-fi
+# # check if the model_downloads/original directory exists which we will use as the model to finetune with
+# # in future maybe have an optional flag that points to model path for when we use quantized models?
+# if [ ! -d "$models_dir" ]; then
+#   echo "You must save the stable diffusion model to ./model_downloads/original"
+#   exit 1
+# fi
 
 # set output_dir based on dataset_path if it was not already set from the output_dir flag
 if [ "$output_dir_set" = false ]; then
@@ -49,14 +50,12 @@ fi
 accelerate launch train_text_to_image_lora.py \
   --pretrained_model_name_or_path=$models_dir \
   --dataset_name=$dataset_path \
-  --resolution=512 --center_crop --random_flip \
-  --learning_rate=1e-04 \
+  --learning_rate=1e-05 \
   --max_train_samples=1000 \
   --num_train_epochs=20 \
-  --checkpointing_steps=1000 \
+  --checkpointing_steps=10 \
   --train_batch_size=4 \
   --resume_from_checkpoint=latest \
-  --enable_xformers_memory_efficient_attention \
   --output_dir=$output_dir \
 
 

@@ -53,7 +53,7 @@ from diffusers.utils.torch_utils import is_compiled_module
 
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
-check_min_version("0.28.0.dev0")
+# check_min_version("0.28.0.dev0")
 
 logger = get_logger(__name__, log_level="INFO")
 
@@ -698,6 +698,10 @@ def main():
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
     global_step = 0
     first_epoch = 0
+    
+    # initialize variables for keeping track of this expert's representative embedding
+    total_embedding = 0
+    num_samples = 0
 
     # Potentially load in the weights and states from a previous save
     if args.resume_from_checkpoint:
@@ -720,6 +724,9 @@ def main():
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             global_step = int(path.split("-")[1])
+            checkpoint_representative_embedding = torch.load(os.path.join(args.output_dir, path, 'representative_embedding.pt'))
+            num_samples = global_step
+            total_embedding = checkpoint_representative_embedding * num_samples # checkpoint_representative_embedding starts out as an average
 
             initial_global_step = global_step
             first_epoch = global_step // num_update_steps_per_epoch
@@ -762,6 +769,11 @@ def main():
 
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"], return_dict=False)[0]
+                
+                # representative embedding for this expert stable diffusor
+                batch_embedding = encoder_hidden_states.mean(dim=0)  # Average over sequence length
+                total_embedding += batch_embedding
+                num_samples += batch_embedding.shape[0]
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -841,6 +853,8 @@ def main():
 
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
+                        checkpoint_representative_embedding = total_embedding / num_samples
+                        torch.save(checkpoint_representative_embedding, os.path.join(save_path, 'representative_embedding.pt'))
 
                         unwrapped_unet = unwrap_model(unet)
                         unet_lora_state_dict = convert_state_dict_to_diffusers(
