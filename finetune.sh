@@ -47,13 +47,14 @@ if [ "$output_dir_set" = false ]; then
   fi
 fi
 
+# --num_processes=1 --main_process_port=29501 --gpu_ids=1
 accelerate launch train_text_to_image_lora.py \
   --pretrained_model_name_or_path=$models_dir \
   --dataset_name=$dataset_path \
   --learning_rate=1e-05 \
   --max_train_samples=1000 \
   --num_train_epochs=20 \
-  --checkpointing_steps=1000 \
+  --checkpointing_steps=500 \
   --train_batch_size=4 \
   --resume_from_checkpoint=latest \
   --output_dir=$output_dir \

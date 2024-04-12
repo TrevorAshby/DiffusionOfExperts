@@ -9,7 +9,6 @@ from diffusers.loaders import LoraLoaderMixin
 
 from tqdm.notebook import tqdm
 
-from typing import Union, List, Optional
 import os
 
 
@@ -17,8 +16,8 @@ class StableDiffusion(nn.Module):
     def __init__(
         self,
         model_path: str,
-        lora_path: Optional[str] = None, # i.e. './model_downloads/clothes_finetuned_model'
-        variant: Optional[str] = None, # i.e. 'fp16' or 'bf16'
+        lora_path: str | None = None, # i.e. './model_downloads/clothes_finetuned_model'
+        variant: str | None = None, # i.e. 'fp16' or 'bf16'
         device='cuda',
     ):
         super(StableDiffusion, self).__init__()
@@ -50,7 +49,7 @@ class StableDiffusion(nn.Module):
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
 
-    def forward(self, prompt: Union[str, List[str]], num_inference_steps: int = 50):
+    def forward(self, prompt: str | list[str], num_inference_steps: int = 50):
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
         
         encoded_prompt = self.encode_prompt(prompt)
@@ -69,19 +68,7 @@ class StableDiffusion(nn.Module):
             latent_model_input = torch.cat([latents] * 2) # double the latents since we have the unconditional text prompt too
             latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
             
-            # predict the noise residual
-            noise_pred = self.unet(
-                latent_model_input,
-                t,
-                encoder_hidden_states=encoded_prompt,
-                return_dict=False,
-            )[0]
-            if torch.isnan(noise_pred).any():
-                raise ValueError()
-            
-            # perform guidance
-            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
+            noise_pred = self.predict_noise(latent_model_input, t, encoded_prompt)
             
             # compute the previous noisy sample x_t -> x_t-1
             latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
@@ -92,7 +79,7 @@ class StableDiffusion(nn.Module):
         
         return image
 
-    def encode_prompt(self, prompt: Union[str, List[str]]):
+    def encode_prompt(self, prompt: str | list[str]):
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
         prompt = self._maybe_convert_prompt(prompt, self.tokenizer)
         
@@ -131,11 +118,27 @@ class StableDiffusion(nn.Module):
         latents = randn_tensor(shape, device=self.device) * self.scheduler.init_noise_sigma
         return latents
 
-
+    def predict_noise(self, latent_inputs: torch.Tensor, timestep: torch.Tensor, 
+                      encoded_prompt: torch.Tensor, unet: UNet2DConditionModel | None=None) -> torch.Tensor:
+        if unet is None:
+            unet = self.unet
+        # predict the noise residual
+        noise_pred = unet(
+            latent_inputs,
+            timestep,
+            encoder_hidden_states=encoded_prompt,
+            return_dict=False,
+        )[0]
+        
+        # perform guidance
+        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
+        
+        return noise_pred
 
     ## Huggingface implementations  ##
 
-    def _maybe_convert_prompt(self, prompt: Union[str, List[str]], tokenizer: CLIPTokenizer):  
+    def _maybe_convert_prompt(self, prompt: str | list[str], tokenizer: CLIPTokenizer):  
         r"""
         Processes prompts that include a special token corresponding to a multi-vector textual inversion embedding to
         be replaced with multiple special tokens each corresponding to one of the vectors. If the prompt has no textual
@@ -153,7 +156,7 @@ class StableDiffusion(nn.Module):
         prompts = [prompt] if isinstance(prompt, str) else prompt
         prompts = [self._handle_multi_vector_textual_inversion(p, tokenizer) for p in prompts]
 
-        if not isinstance(prompt, List):
+        if isinstance(prompt, str):
             return prompts[0]
 
         return prompts

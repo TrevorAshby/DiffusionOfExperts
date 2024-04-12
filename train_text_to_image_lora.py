@@ -937,6 +937,7 @@ def main():
             unet_lora_layers=unet_lora_state_dict,
             safe_serialization=True,
         )
+        torch.save(checkpoint_representative_embedding, os.path.join(args.output_dir, 'representative_embedding.pt'))
 
         if args.push_to_hub:
             save_model_card(
