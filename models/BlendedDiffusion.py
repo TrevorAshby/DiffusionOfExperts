@@ -1,6 +1,7 @@
 import os
 import copy
 import torch
+from torch import nn
 from diffusers.loaders import LoraLoaderMixin
 from torch.nn.functional import cosine_similarity
 
@@ -10,10 +11,15 @@ from models.StableDiffusion import StableDiffusion
 
 
 class BlendedDiffusion(StableDiffusion):
-    def __init__(self, model_path: str, lora_paths: list[str]):
+    def __init__(self, model_path: str, lora_paths: list[str], train=False):
         super().__init__(model_path)
         
-        self.unets = [copy.deepcopy(self.unet.to(self.device)) for _ in lora_paths]
+        self.unets = nn.ModuleList() if train else []
+        for _ in lora_paths:
+            new_unet = copy.deepcopy(self.unet.to(self.device))
+            self.unets.append(new_unet)
+        self.unet = None # let it be garbage collected since we don't need the original unet any more
+
         self.representative_embeddings = []
         
         # apply lora weights to each unet

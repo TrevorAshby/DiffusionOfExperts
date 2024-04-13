@@ -1,26 +1,16 @@
-import copy
 import torch
 from torch import nn
-from diffusers.loaders import LoraLoaderMixin
 
 from tqdm.notebook import tqdm
 
-from models.StableDiffusion import StableDiffusion
+from models.BlendedDiffusion import BlendedDiffusion
 
 
-class StaticBlendedDiffusion(StableDiffusion):
+class StaticBlendedDiffusion(BlendedDiffusion):
     def __init__(self, model_path: str, lora_paths: list[str]):
-        super().__init__(model_path)
+        super().__init__(model_path, lora_paths, train=True)
         
-        self.unets = [copy.deepcopy(self.unet.to(self.device)) for _ in lora_paths]
-        self.representative_embeddings = []
-        
-        # apply lora weights to each unet
-        for unet, lora_path in zip(self.unets, lora_paths):
-            # load lora weights
-            state_dict, network_alphas = LoraLoaderMixin.lora_state_dict(lora_path, weight_name='pytorch_lora_weights.safetensors')
-            LoraLoaderMixin.load_lora_into_unet(state_dict, network_alphas=network_alphas, unet=unet)
-        
+        self.representative_embeddings = None # let it be garbage collected
         self.weights = nn.Parameter(torch.rand(len(lora_paths)))
 
     
