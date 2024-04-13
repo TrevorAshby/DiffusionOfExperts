@@ -4,6 +4,8 @@
 # models_dir="$(dirname "$(readlink -f "$0")")/model_downloads/original"
 models_dir="CompVis/stable-diffusion-v1-4"
 
+. .venv/bin/activate
+
 usage() {
   echo "Usage: $0 --dataset PATH [--output_dir PATH]"
   echo "You must pass a --dataset flag that points to a path of a saved dataset, such as --dataset ./clothes_dataset"
