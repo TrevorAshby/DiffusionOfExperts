@@ -46,7 +46,8 @@ class StableDiffusion(nn.Module):
         
         self.device = device
         self.guidance_scale = 7.5
-        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
+        self.sample_size: int = self.unet.config.sample_size
+        self.vae_scale_factor: int = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
 
     def forward(self, prompt: str | list[str], num_inference_steps: int = 50):
@@ -110,7 +111,7 @@ class StableDiffusion(nn.Module):
         return torch.cat([negative_prompt_embeds, prompt_embeds])
         
     def prepare_latents(self, batch_size: int, num_channels_latents: int):
-        height = self.unet.config.sample_size * self.vae_scale_factor
+        height = self.sample_size * self.vae_scale_factor
         width = height
         
         shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
@@ -124,9 +125,9 @@ class StableDiffusion(nn.Module):
             unet = self.unet
         # predict the noise residual
         noise_pred = unet(
-            latent_inputs,
-            timestep,
-            encoder_hidden_states=encoded_prompt,
+            latent_inputs.to(unet.device),
+            timestep.to(unet.device),
+            encoder_hidden_states=encoded_prompt.to(unet.device),
             return_dict=False,
         )[0]
         

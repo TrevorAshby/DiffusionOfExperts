@@ -7,11 +7,11 @@ from models.BlendedDiffusion import BlendedDiffusion
 
 
 class StaticBlendedDiffusion(BlendedDiffusion):
-    def __init__(self, model_path: str, lora_paths: list[str]):
-        super().__init__(model_path, lora_paths, train=True)
+    def __init__(self, model_path: str, lora_paths: list[str], train_lora=True, devices: list[str] | None=None):
+        super().__init__(model_path, lora_paths, train_lora=train_lora, devices=devices)
         
         self.representative_embeddings = None # let it be garbage collected
-        self.weights = nn.Parameter(torch.rand(len(lora_paths)))
+        self.weights = nn.Parameter(torch.rand(len(lora_paths)).to(self.device))
 
     
     def forward(self, prompt: str | list[str], num_inference_steps: int = 50):
@@ -22,10 +22,9 @@ class StaticBlendedDiffusion(BlendedDiffusion):
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
         
-        num_channels_latents = self.unet.config.in_channels
         latents = self.prepare_latents(
             batch_size,
-            num_channels_latents,
+            self.num_channels_latents,
         )
         
         # start denoising process
@@ -36,7 +35,8 @@ class StaticBlendedDiffusion(BlendedDiffusion):
             # due to memory constraints on gpu, we can't run these all in a single batch, so do it in a for loop
             noise_preds = []
             for unet in self.unets:
-                noise_preds.append(self.predict_noise(latent_model_input, t, encoded_prompt, unet))
+                noise_pred = self.predict_noise(latent_model_input, t, encoded_prompt, unet).to(self.device)
+                noise_preds.append(noise_pred)
             noise_preds = torch.stack(noise_preds).to(self.device)
             
             # compute weighted average

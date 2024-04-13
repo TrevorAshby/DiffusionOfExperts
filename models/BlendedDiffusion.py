@@ -11,13 +11,17 @@ from models.StableDiffusion import StableDiffusion
 
 
 class BlendedDiffusion(StableDiffusion):
-    def __init__(self, model_path: str, lora_paths: list[str], train=False):
+    def __init__(self, model_path: str, lora_paths: list[str], train_lora=False, devices: list[str] | None = None):
         super().__init__(model_path)
+        if devices is None:
+            devices = [self.device] * len(lora_paths)
         
-        self.unets = nn.ModuleList() if train else []
-        for _ in lora_paths:
-            new_unet = copy.deepcopy(self.unet.to(self.device))
+        self.unets = nn.ModuleList() if train_lora else []
+        for device in devices:
+            new_unet = copy.deepcopy(self.unet.to(device))
             self.unets.append(new_unet)
+        
+        self.num_channels_latents: int = self.unet.config.in_channels
         self.unet = None # let it be garbage collected since we don't need the original unet any more
 
         self.representative_embeddings = []
@@ -51,10 +55,9 @@ class BlendedDiffusion(StableDiffusion):
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
         
-        num_channels_latents = self.unet.config.in_channels
         latents = self.prepare_latents(
             batch_size,
-            num_channels_latents,
+            self.num_channels_latents,
         )
         
         # start denoising process
@@ -65,7 +68,8 @@ class BlendedDiffusion(StableDiffusion):
             # due to memory constraints on gpu, we can't run these all in a single batch, so do it in a for loop
             noise_preds = []
             for unet in self.unets:
-                noise_preds.append(self.predict_noise(latent_model_input, t, encoded_prompt, unet))
+                noise_pred = self.predict_noise(latent_model_input, t, encoded_prompt, unet).to(self.device)
+                noise_preds.append(noise_pred)
             noise_preds = torch.stack(noise_preds).to(self.device)
             
             # compute weighted average
