@@ -6,8 +6,9 @@ from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.utils.torch_utils import randn_tensor
 from diffusers.loaders import LoraLoaderMixin
+from typing import Union
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 import os
 
@@ -16,8 +17,8 @@ class StableDiffusion(nn.Module):
     def __init__(
         self,
         model_path: str,
-        lora_path: str | None = None, # i.e. './model_downloads/clothes_finetuned_model'
-        variant: str | None = None, # i.e. 'fp16' or 'bf16'
+        lora_path: Union[str, None] = None, # i.e. './model_downloads/clothes_finetuned_model'
+        variant: Union[str, None] = None, # i.e. 'fp16' or 'bf16'
         device='cuda',
     ):
         super(StableDiffusion, self).__init__()
@@ -50,7 +51,7 @@ class StableDiffusion(nn.Module):
         self.vae_scale_factor: int = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
 
-    def forward(self, prompt: str | list[str], num_inference_steps: int = 50):
+    def forward(self, prompt: Union[str, list[str]], num_inference_steps: int = 50):
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
         
         encoded_prompt = self.encode_prompt(prompt)
@@ -80,7 +81,7 @@ class StableDiffusion(nn.Module):
         
         return image
 
-    def encode_prompt(self, prompt: str | list[str]):
+    def encode_prompt(self, prompt: Union[str, list[str]]):
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
         prompt = self._maybe_convert_prompt(prompt, self.tokenizer)
         
@@ -120,7 +121,7 @@ class StableDiffusion(nn.Module):
         return latents
 
     def predict_noise(self, latent_inputs: torch.Tensor, timestep: torch.Tensor, 
-                      encoded_prompt: torch.Tensor, unet: UNet2DConditionModel | None=None) -> torch.Tensor:
+                      encoded_prompt: torch.Tensor, unet: Union[UNet2DConditionModel, None]=None) -> torch.Tensor:
         if unet is None:
             unet = self.unet
         # predict the noise residual
@@ -139,7 +140,7 @@ class StableDiffusion(nn.Module):
 
     ## Huggingface implementations  ##
 
-    def _maybe_convert_prompt(self, prompt: str | list[str], tokenizer: CLIPTokenizer):  
+    def _maybe_convert_prompt(self, prompt: Union[str, list[str]], tokenizer: CLIPTokenizer):  
         r"""
         Processes prompts that include a special token corresponding to a multi-vector textual inversion embedding to
         be replaced with multiple special tokens each corresponding to one of the vectors. If the prompt has no textual

@@ -9,3 +9,5 @@ pixelart_dataset/
 
 # downloaded models
 model_downloads/
+wandb/
+*.DS_Store
