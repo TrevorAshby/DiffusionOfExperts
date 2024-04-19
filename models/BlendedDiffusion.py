@@ -45,7 +45,6 @@ class BlendedDiffusion(StableDiffusion):
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
         
         encoded_prompt = self.encode_prompt(prompt)
-        
         test_embedding = encoded_prompt.repeat(self.representative_embeddings.shape[0], 1, 1, 1)
         test_embedding = test_embedding.flatten(start_dim=1)
         similarities = cosine_similarity(test_embedding, self.representative_embeddings, dim=1)

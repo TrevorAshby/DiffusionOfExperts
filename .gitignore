@@ -6,6 +6,8 @@ clothes_dataset/
 photograph_dataset/
 pixelart_dataset/
 
-
 # downloaded models
 model_downloads/
+
+# cache
+__pycache__
