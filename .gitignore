@@ -6,6 +6,19 @@ clothes_dataset/
 photograph_dataset/
 pixelart_dataset/
 
+
+# downloaded models
+model_downloads/
+wandb/
+*.DS_Store
+# virtual env
+.venv/
+
+# datasets
+clothes_dataset/
+photograph_dataset/
+pixelart_dataset/
+
 # downloaded models
 model_downloads/
 
