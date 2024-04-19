@@ -37,6 +37,7 @@ class StableDiffusion(nn.Module):
         self.unet.requires_grad_(False) # if there are lora weights, these will be finetuned instead
         
         self.representative_embedding = None
+        
         # add in lora weights to unet if applicable
         if lora_path:
             # load lora weights
