@@ -8,7 +8,7 @@ from diffusers.utils.torch_utils import randn_tensor
 from diffusers.loaders import LoraLoaderMixin
 from typing import Union
 
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 import os
 
