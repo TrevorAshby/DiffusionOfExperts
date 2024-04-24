@@ -3,7 +3,7 @@ import copy
 import torch
 from torch import nn
 from diffusers.loaders import LoraLoaderMixin
-from torch.nn.functional import cosine_similarity
+from torch.nn.functional import cosine_similarity, softmax
 
 from tqdm.notebook import tqdm
 
@@ -34,7 +34,7 @@ class BlendedDiffusion(StableDiffusion):
             # load representative embedding
             representative_embedding = torch.load(os.path.join(lora_path, 'representative_embedding.pt'))
             # we do classifier-free guidance meaning the encoded text prompts has shape[0] of 2
-            self.representative_embeddings.append(representative_embedding.repeat(2, 1, 1)) 
+            self.representative_embeddings.append(representative_embedding.unsqueeze(0).expand(2, -1, -1)) 
         
         # convert python list into tensor
         self.representative_embeddings = torch.stack(self.representative_embeddings).to(self.device)
@@ -45,11 +45,15 @@ class BlendedDiffusion(StableDiffusion):
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
         
         encoded_prompt = self.encode_prompt(prompt)
-        test_embedding = encoded_prompt.repeat(self.representative_embeddings.shape[0], 1, 1, 1)
-        test_embedding = test_embedding.flatten(start_dim=1)
-        similarities = cosine_similarity(test_embedding, self.representative_embeddings, dim=1)
-        weights = torch.nn.functional.softmax(similarities, dim=0)
-        weights = weights.view(-1, 1, 1, 1, 1)
+        test_embedding_batch = encoded_prompt.view(batch_size, 2, encoded_prompt.shape[1], encoded_prompt.shape[2])
+        test_embedding_batch = test_embedding_batch.flatten(start_dim=1)
+        test_embedding_batch = test_embedding_batch.unsqueeze(0).expand(len(self.unets), -1, -1)
+        
+        rep_embedding_batch = self.representative_embeddings.unsqueeze(1).expand(-1, batch_size, -1)
+        
+        similarities = cosine_similarity(test_embedding_batch, rep_embedding_batch, dim=2)
+        weights = softmax(similarities, dim=0)
+        weights = weights.view(-1, batch_size, 1, 1, 1)
         
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
